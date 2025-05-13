@@ -1,8 +1,9 @@
 package com.amazonaws.services.msf;
 
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
+import com.amazonaws.services.msf.processor.EventDetector;
+import com.amazonaws.services.msf.sink.SqsSink;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
-import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.connector.kinesis.sink.KinesisStreamsSink;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
@@ -25,7 +26,7 @@ public class BasicStreamingJob {
     private static final Logger LOGGER = LogManager.getLogger(BasicStreamingJob.class);
 
     // Name of the local JSON resource with the application properties in the same format as they are received from the Amazon Managed Service for Apache Flink runtime
-    private static final String LOCAL_APPLICATION_PROPERTIES_RESOURCE = "flink-application-properties-dev.json";
+    private static final String LOCAL_APPLICATION_PROPERTIES_RESOURCE = "flink-application-properties.json";
 
     /**
      * Load application properties from Amazon Managed Service for Apache Flink runtime or from a local resource, when the environment is local
@@ -58,19 +59,33 @@ public class BasicStreamingJob {
     }
 
     public static void main(String[] args) throws Exception {
-        // Set up the streaming execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-
-        // Load application parameters
         final Map<String, Properties> applicationParameters = loadApplicationProperties(env);
 
         SourceFunction<String> source = createSource(applicationParameters.get("InputStream0"));
-        DataStream<String> input = env.addSource(source, "Kinesis Source");
+        DataStream<String> raw = env.addSource(source, "Kinesis Source");
 
-        Sink<String> sink = createSink(applicationParameters.get("OutputStream0"));
-        input.sinkTo(sink);
+        // 1) 이벤트 감지
+        DataStream<String> detected = raw
+                .keyBy(value -> 0)
+                .flatMap(new EventDetector())
+                .name("Event Detector");
 
-        env.execute("Flink streaming Java API skeleton");
+        // 2) 로그 찍고
+        DataStream<String> printed = logInputData(detected);
+
+        // 3) SQS 전송
+        String queueUrl = applicationParameters.get("Sqs0").getProperty("queue.url");
+        printed.addSink(new SqsSink(queueUrl)).name("SQS Sink");
+
+        env.execute("Kinesis → Event Detection → SQS");
+    }
+
+    private static DataStream<String> logInputData(DataStream<String> input) {
+        return input.map(value -> {
+            System.out.println(">>> EVENT: " + value);
+            return value;
+        });
     }
 
 }
