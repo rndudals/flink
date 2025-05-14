@@ -4,7 +4,6 @@ import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
 import com.amazonaws.services.msf.processor.EventDetector;
 import com.amazonaws.services.msf.sink.SqsSink;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
-import org.apache.flink.connector.kinesis.sink.KinesisStreamsSink;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -17,20 +16,11 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 
-/**
- * A basic Flink Java application to run on Amazon Managed Service for Apache Flink,
- * with Kinesis Data Streams as source and sink.
- */
+
 public class BasicStreamingJob {
 
     private static final Logger LOGGER = LogManager.getLogger(BasicStreamingJob.class);
-
-    // Name of the local JSON resource with the application properties in the same format as they are received from the Amazon Managed Service for Apache Flink runtime
     private static final String LOCAL_APPLICATION_PROPERTIES_RESOURCE = "flink-application-properties.json";
-
-    /**
-     * Load application properties from Amazon Managed Service for Apache Flink runtime or from a local resource, when the environment is local
-     */
     private static Map<String, Properties> loadApplicationProperties(StreamExecutionEnvironment env) throws IOException {
         if (env instanceof LocalStreamEnvironment) {
             LOGGER.info("Loading application properties from '{}'", LOCAL_APPLICATION_PROPERTIES_RESOURCE);
@@ -48,15 +38,6 @@ public class BasicStreamingJob {
         return new FlinkKinesisConsumer<>(inputStreamName, new SimpleStringSchema(), inputProperties);
     }
 
-    private static KinesisStreamsSink<String> createSink(Properties outputProperties) {
-        String outputStreamName = outputProperties.getProperty("stream.name");
-        return KinesisStreamsSink.<String>builder()
-                .setKinesisClientProperties(outputProperties)
-                .setSerializationSchema(new SimpleStringSchema())
-                .setStreamName(outputStreamName)
-                .setPartitionKeyGenerator(element -> String.valueOf(element.hashCode()))
-                .build();
-    }
 
     public static void main(String[] args) throws Exception {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -83,7 +64,7 @@ public class BasicStreamingJob {
 
     private static DataStream<String> logInputData(DataStream<String> input) {
         return input.map(value -> {
-            System.out.println(">>> EVENT: " + value);
+            System.out.println(">>> EVENT: " + value.toString());
             return value;
         });
     }

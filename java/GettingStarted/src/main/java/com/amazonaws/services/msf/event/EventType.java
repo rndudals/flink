@@ -1,8 +1,26 @@
 package com.amazonaws.services.msf.event;
 
 public enum EventType {
-    IDLE,               // A-1 공회전
-    ACC_DECEL,          // B-1 급가/감속
-    OVERSPEED           // B-2 과속
-    // 추후 SHARP_TURN, LANE_DEPART 등 추가
+
+    // 완료
+    IDLE_ENGINE("공회전"),               // A-1
+    RAPID_ACCELERATION("급가속"),       // B-1
+    RAPID_DECELERATION("급감속"),
+    OVERSPEED("과속"),          // B-2
+    INVASION("차선 이탈"),
+
+    // TODO
+    NO_OPERATION("미조작"),
+    SHARP_TURN("급회전"),
+    SAFE_DISTANCE_VIOLATION("안전 거리 미준수");
+    private final String description;
+
+    EventType(String description) {
+        this.description = description;
+    }
+
+    @Override
+    public String toString() {
+        return description;
+    }
 }
